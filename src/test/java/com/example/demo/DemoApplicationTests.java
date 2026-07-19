@@ -1,11 +1,14 @@
 package com.example.demo;
 
 import com.example.demo.hello.HelloMessageRepository;
+import dasniko.testcontainers.keycloak.KeycloakContainer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Container;
@@ -29,6 +32,12 @@ class DemoApplicationTests {
 			.withUsername("postgres")
 			.withPassword("postgres");
 
+	@Container
+	public static KeycloakContainer keycloakContainer = new KeycloakContainer("quay.io/keycloak/keycloak:latest")
+                    .withEnv("KEYCLOAK_ADMIN", "admin")
+                    .withEnv("KEYCLOAK_ADMIN_PASSWORD", "password")
+                    .withRealmImportFile("realm/demo-realm.json");
+
 	@Autowired
 	private MockMvc mockMvc;
 
@@ -37,9 +46,13 @@ class DemoApplicationTests {
 
 	@Test
 	void postHelloStoresTextInDatabase() throws Exception {
+		var token = keycloakContainer.getAccessToken("demo", "demo-client", "test@test.com", "test");
+
+
 		String hello = "Hello from integration test";
 
 		MvcResult result = mockMvc.perform(post("/hello")
+						.header("Authorization", "Bearer " + token)
 						.contentType(TEXT_PLAIN)
 						.content(hello))
 				.andExpect(status().isCreated())
@@ -49,4 +62,9 @@ class DemoApplicationTests {
 		assertEquals(hello, helloMessageRepository.findById(id).orElseThrow().getHello());
 	}
 
+
+	@DynamicPropertySource
+	static void registerResourceServerIssuerProperty(DynamicPropertyRegistry registry) {
+		registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> keycloakContainer.getAuthServerUrl() + "/realms/demo");
+	}
 }

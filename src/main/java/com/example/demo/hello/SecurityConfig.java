@@ -2,6 +2,7 @@ package com.example.demo.hello;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -12,9 +13,10 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		return http
 				.csrf(csrf -> csrf.ignoringRequestMatchers("/hello"))
-				.authorizeHttpRequests(authorize -> authorize
-						.requestMatchers("/hello").permitAll()
-						.anyRequest().authenticated())
+				.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+				.oauth2ResourceServer(oauth2 -> oauth2.jwt(
+						Customizer.withDefaults()
+				))
 				.build();
 	}
 }

@@ -24,7 +24,7 @@ class DemoApplicationTests {
 
 	@Container
 	@ServiceConnection
-	public static PostgreSQLContainer postgreSQLContainer = new PostgreSQLContainer("postgres:11.1")
+	public static PostgreSQLContainer postgreSQLContainer = new PostgreSQLContainer("postgres:15")
 			.withDatabaseName("postgres")
 			.withUsername("postgres")
 			.withPassword("postgres");
@@ -34,11 +34,6 @@ class DemoApplicationTests {
 
 	@Autowired
 	private HelloMessageRepository helloMessageRepository;
-
-	@Test
-	void contextLoads() {
-
-	}
 
 	@Test
 	void postHelloStoresTextInDatabase() throws Exception {

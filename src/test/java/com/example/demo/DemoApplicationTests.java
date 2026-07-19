@@ -1,7 +1,16 @@
 package com.example.demo;
 
 import com.example.demo.hello.HelloMessageRepository;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +26,7 @@ import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.TEXT_PLAIN;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,8 +62,6 @@ class DemoApplicationTests {
 	@Test
 	void postHelloStoresTextInDatabase() throws Exception {
 		var token = keycloakContainer.getAccessToken("demo", "demo-client", "test@test.com", "test");
-
-
 		String hello = "Hello from integration test";
 
 		MvcResult result = mockMvc.perform(post("/hello")
@@ -65,10 +73,33 @@ class DemoApplicationTests {
 
 		Long id = Long.valueOf(result.getResponse().getContentAsString());
 		assertEquals(hello, helloMessageRepository.findById(id).orElseThrow().getHello());
+		assertTrue(readHelloTopic().contains(hello));
 	}
 
 	@DynamicPropertySource
 	static void registerResourceServerIssuerProperty(DynamicPropertyRegistry registry) {
 		registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> keycloakContainer.getAuthServerUrl() + "/realms/demo");
+		registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
+	}
+
+	private List<String> readHelloTopic() {
+		Map<String, Object> consumerProperties = Map.of(
+				ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers(),
+				ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString(),
+				ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
+				ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
+				ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+
+		try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProperties)) {
+			consumer.subscribe(List.of("hello"));
+			Instant timeout = Instant.now().plusSeconds(10);
+			List<String> values = new java.util.ArrayList<>();
+			while (Instant.now().isBefore(timeout) && values.isEmpty()) {
+				for (ConsumerRecord<String, String> record : consumer.poll(Duration.ofMillis(500))) {
+					values.add(record.value());
+				}
+			}
+			return values;
+		}
 	}
 }

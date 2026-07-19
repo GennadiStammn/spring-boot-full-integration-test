@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,6 +39,10 @@ class DemoApplicationTests {
                     .withEnv("KEYCLOAK_ADMIN_PASSWORD", "password")
                     .withRealmImportFile("realm/demo-realm.json");
 
+	@Container
+	public static ConfluentKafkaContainer kafka = new ConfluentKafkaContainer("confluentinc/cp-kafka:7.4.0")
+			.withEnv("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "true");
+
 	@Autowired
 	private MockMvc mockMvc;
 
@@ -61,7 +66,6 @@ class DemoApplicationTests {
 		Long id = Long.valueOf(result.getResponse().getContentAsString());
 		assertEquals(hello, helloMessageRepository.findById(id).orElseThrow().getHello());
 	}
-
 
 	@DynamicPropertySource
 	static void registerResourceServerIssuerProperty(DynamicPropertyRegistry registry) {

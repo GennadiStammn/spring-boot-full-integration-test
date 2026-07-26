@@ -1,10 +1,16 @@
 package com.example.demo;
 
+import com.example.demo.avro.HelloMessage;
 import com.example.demo.hello.HelloMessageRepository;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,7 +43,7 @@ class DemoApplicationTest extends BaseIntegrationTest {
 	private HelloMessageRepository helloMessageRepository;
 
 	@Test
-	void postHelloStoresTextInDatabase() throws Exception {
+	void when_post_hello_should_store_message_in_database() throws Exception {
 		var token = keycloakContainer.getAccessToken("demo", "demo-client", "test@test.com", "test");
 		String hello = "Hello from integration test";
 
@@ -51,6 +57,30 @@ class DemoApplicationTest extends BaseIntegrationTest {
 		Long id = Long.valueOf(result.getResponse().getContentAsString());
 		assertEquals(hello, helloMessageRepository.findById(id).orElseThrow().getHello());
 		assertTrue(readHelloTopic().contains(hello));
+	}
+
+	@Test
+	void when_receive_avro_hello_should_store_message_in_database() throws Exception {
+		String hello = "Hello from Avro";
+		Map<String, Object> producerProperties = Map.of(
+				ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaContainer.getBootstrapServers(),
+				ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
+				ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class,
+				"schema.registry.url", "http://" + schemaRegistry.getHost() + ":" + schemaRegistry.getFirstMappedPort());
+
+		try (KafkaProducer<String, HelloMessage> producer =
+					 new KafkaProducer<>(producerProperties)) {
+			producer.send(new ProducerRecord<>("hello-avro", new HelloMessage(hello))).get();
+		}
+
+		Instant timeout = Instant.now().plusSeconds(10);
+		while (Instant.now().isBefore(timeout)
+				&& helloMessageRepository.findAll().stream().noneMatch(message -> hello.equals(message.getHello()))) {
+			Thread.sleep(100);
+		}
+
+		assertTrue(helloMessageRepository.findAll().stream()
+				.anyMatch(message -> hello.equals(message.getHello())));
 	}
 
 	private List<String> readHelloTopic() {

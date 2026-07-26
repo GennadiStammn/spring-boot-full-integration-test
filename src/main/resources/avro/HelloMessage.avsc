@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "HelloMessage",
+  "namespace": "com.example.demo.avro",
+  "fields": [
+    {
+      "name": "freeText",
+      "type": "string"
+    }
+  ]
+}

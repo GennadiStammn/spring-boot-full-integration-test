@@ -12,7 +12,7 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		return http
-				.csrf(csrf -> csrf.ignoringRequestMatchers("/hello"))
+				.csrf(csrf -> csrf.ignoringRequestMatchers("/hello", "/queue"))
 				.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth2 -> oauth2.jwt(
 						Customizer.withDefaults()

@@ -60,6 +60,27 @@ class DemoApplicationTest extends BaseIntegrationTest {
 	}
 
 	@Test
+	void when_post_queue_should_accept_message() throws Exception {
+		var token = keycloakContainer.getAccessToken("demo", "demo-client", "test@test.com", "test");
+
+		mockMvc.perform(post("/queue")
+						.header("Authorization", "Bearer " + token)
+						.contentType(TEXT_PLAIN)
+						.content("Queued from integration test 1"))
+				.andExpect(status().isAccepted());
+		mockMvc.perform(post("/queue")
+						.header("Authorization", "Bearer " + token)
+						.contentType(TEXT_PLAIN)
+						.content("Queued from integration test 2"))
+				.andExpect(status().isAccepted());
+		mockMvc.perform(post("/queue")
+						.header("Authorization", "Bearer " + token)
+						.contentType(TEXT_PLAIN)
+						.content("Queued from integration test 3"))
+				.andExpect(status().isAccepted());
+	}
+
+	@Test
 	void when_receive_avro_hello_should_store_message_in_database() throws Exception {
 		String hello = "Hello from Avro";
 		Map<String, Object> producerProperties = Map.of(
